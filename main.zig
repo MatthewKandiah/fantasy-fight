@@ -9,12 +9,17 @@ pub fn main() void {
         player2,
     );
 
-    _ = game;
+    while (game.status == .IN_PROGRESS) {
+        // game loop
+        break;
+    }
 }
 
+// TODO - allowed and forbidden maneuver type and maneuver colour for each player
 const GameState = struct {
     player1: Player,
     player2: Player,
+    status: GameStatus,
 
     const Self = @This();
 
@@ -22,8 +27,23 @@ const GameState = struct {
         return .{
             .player1 = player1,
             .player2 = player2,
+            .status = .IN_PROGRESS,
         };
     }
+
+    fn update(self: *Self, player1_maneuver: Maneuver, player2_maneuver: Maneuver) void {
+        _ = self;
+        _ = player1_maneuver;
+        _ = player2_maneuver;
+    }
+    // TODO - calculate available options, print them to stdout, get player choice from stdin, update game state
+};
+
+const GameStatus = enum {
+    IN_PROGRESS,
+    DRAW,
+    PLAYER1_VICTORY,
+    PLAYER2_VICTORY,
 };
 
 const CharacterType = enum {
@@ -93,7 +113,7 @@ const Maneuver = struct {
     x: i32,
     mod: i32,
     colour: ManeuverColour,
-    extended_range: bool,
+    type: ManeuverType,
 };
 
 const ManeuverColour = enum {
@@ -105,6 +125,15 @@ const ManeuverColour = enum {
     WHITE,
     BLACK,
     BROWN,
+};
+
+const ManeuverType = enum {
+    DOWN_SWING,
+    SIDE_SWING,
+    THRUST,
+    SPECIAL,
+    JUMP,
+    EXTENDED_RANGE,
 };
 
 fn newDwarfInChainmailWithTwoHandedAx(name: []const u8) Player {
@@ -411,202 +440,202 @@ fn newDwarfInChainmailWithTwoHandedAx(name: []const u8) Player {
             .attacks_count = 1,
             .maneuvers = &[_]Maneuver{
                 Maneuver{
-                    .name = "Down Swing Bash",
+                    .name = "Bash",
                     .description = "placholder",
                     .pg = 36,
                     .x = 50,
                     .mod = 3,
                     .colour = .ORANGE,
-                    .extended_range = false,
+                    .type = .DOWN_SWING,
                 },
                 Maneuver{
-                    .name = "Down Swing Smash",
+                    .name = "Smash",
                     .description = "placeholder",
                     .pg = 24,
                     .x = 50,
                     .mod = 2,
                     .colour = .ORANGE,
-                    .extended_range = false,
+                    .type = .DOWN_SWING,
                 },
                 Maneuver{
-                    .name = "Side Swing Strong",
+                    .name = "Strong",
                     .description = "placeholder",
                     .pg = 28,
                     .x = 64,
                     .mod = 1,
                     .colour = .ORANGE,
-                    .extended_range = false,
+                    .type = .SIDE_SWING,
                 },
                 Maneuver{
-                    .name = "Side Swing High",
+                    .name = "High",
                     .description = "placeholder",
                     .pg = 10,
                     .x = 64,
                     .mod = -1,
                     .colour = .RED,
-                    .extended_range = false,
+                    .type = .SIDE_SWING,
                 },
                 Maneuver{
-                    .name = "Side Swing Low",
+                    .name = "Low",
                     .description = "placeholder",
                     .pg = 2,
                     .x = 58,
                     .mod = -1,
                     .colour = .BLUE,
-                    .extended_range = false,
+                    .type = .SIDE_SWING,
                 },
                 Maneuver{
-                    .name = "Thrust Hook Shield",
+                    .name = "Hook Shield",
                     .description = "placeholder",
                     .pg = 32,
                     .x = 54,
                     .mod = -2,
                     .colour = .RED,
-                    .extended_range = false,
+                    .type = .THRUST,
                 },
                 Maneuver{
-                    .name = "Thrust Hook Leg",
+                    .name = "Hook Leg",
                     .description = "placeholder",
                     .pg = 14,
                     .x = 60,
                     .mod = -4,
                     .colour = .BLUE,
-                    .extended_range = false,
+                    .type = .THRUST,
                 },
                 Maneuver{
-                    .name = "Special Kick",
+                    .name = "Kick",
                     .description = "placeholder",
                     .pg = 34,
                     .x = 56,
                     .mod = -1,
                     .colour = .BLUE,
-                    .extended_range = false,
+                    .type = .SPECIAL,
                 },
                 Maneuver{
-                    .name = "Special Wild Swing",
+                    .name = "Wild Swing",
                     .description = "placeholder",
                     .pg = 40,
                     .x = 58,
                     .mod = 3,
                     .colour = .YELLOW,
-                    .extended_range = false,
+                    .type = .SPECIAL,
                 },
                 Maneuver{
-                    .name = "Special Dislodge Weapon",
+                    .name = "Dislodge Weapon",
                     .description = "placeholder",
                     .pg = 30,
                     .x = 58,
                     .mod = -4,
                     .colour = .BLUE,
-                    .extended_range = false,
+                    .type = .SPECIAL,
                 },
                 Maneuver{
-                    .name = "Special Retrieve Weapon",
+                    .name = "Retrieve Weapon",
                     .description = "placeholder",
                     .pg = 46,
                     .x = 52,
                     .mod = -6,
                     .colour = .GREEN,
-                    .extended_range = false,
+                    .type = .SPECIAL,
                 },
                 Maneuver{
-                    .name = "Jump Up",
+                    .name = "Up",
                     .description = "placeholder",
                     .pg = 18,
                     .x = 52,
                     .mod = -6,
                     .colour = .GREEN,
-                    .extended_range = false,
+                    .type = .JUMP,
                 },
                 Maneuver{
-                    .name = "Jump Dodge",
+                    .name = "Dodge",
                     .description = "placeholder",
                     .pg = 8,
                     .x = 52,
                     .mod = -4,
                     .colour = .YELLOW,
-                    .extended_range = false,
+                    .type = .JUMP,
                 },
                 Maneuver{
-                    .name = "Jump Duck",
+                    .name = "Duck",
                     .description = "placeholder",
                     .pg = 20,
                     .x = 52,
                     .mod = -5,
                     .colour = .GREEN,
-                    .extended_range = false,
+                    .type = .JUMP,
                 },
                 Maneuver{
-                    .name = "Jump Away",
+                    .name = "Away",
                     .description = "placeholder",
                     .pg = 16,
                     .x = 62,
                     .mod = -4,
                     .colour = .YELLOW,
-                    .extended_range = false,
+                    .type = .JUMP,
                 },
                 Maneuver{
-                    .name = "Extended Range Charge",
+                    .name = "Charge",
                     .description = "placeholder",
                     .pg = 50,
                     .x = 50,
                     .mod = 5,
                     .colour = .WHITE,
-                    .extended_range = true,
+                    .type = .EXTENDED_RANGE,
                 },
                 Maneuver{
-                    .name = "Extended Range Swing High",
+                    .name = "Swing High",
                     .description = "placeholder",
                     .pg = 64,
                     .x = 64,
                     .mod = 3,
                     .colour = .BLACK,
-                    .extended_range = true,
+                    .type = .EXTENDED_RANGE,
                 },
                 Maneuver{
-                    .name = "Extended Range Swing Low",
+                    .name = "Swing Low",
                     .description = "placeholder",
                     .pg = 58,
                     .x = 58,
                     .mod = 3,
                     .colour = .BLACK,
-                    .extended_range = true,
+                    .type = .EXTENDED_RANGE,
                 },
                 Maneuver{
-                    .name = "Extended Range Thrust Low",
+                    .name = "Thrust Low",
                     .description = "placeholder",
                     .pg = 60,
                     .x = 60,
                     .mod = 0,
                     .colour = .WHITE,
-                    .extended_range = true,
+                    .type = .EXTENDED_RANGE,
                 },
                 Maneuver{
-                    .name = "Extended Range Block & Close",
+                    .name = "Block & Close",
                     .description = "placeholder",
                     .pg = 56,
                     .x = 56,
                     .mod = 0,
                     .colour = .BROWN,
-                    .extended_range = true,
+                    .type = .EXTENDED_RANGE,
                 },
                 Maneuver{
-                    .name = "Extended Range Dodge",
+                    .name = "Dodge",
                     .description = "placeholder",
                     .pg = 52,
                     .x = 52,
                     .mod = -4,
                     .colour = .BROWN,
-                    .extended_range = true,
+                    .type = .EXTENDED_RANGE,
                 },
                 Maneuver{
-                    .name = "Extended Range Jump Back",
+                    .name = "Jump Back",
                     .description = "placeholder",
                     .pg = 62,
                     .x = 62,
                     .mod = -4,
                     .colour = .BROWN,
-                    .extended_range = true,
+                    .type = .EXTENDED_RANGE,
                 },
             },
         },
