@@ -33,6 +33,7 @@ const CharacterType = enum {
 const Player = struct {
     character_booklet: CharacterBooklet,
     character_sheet: CharacterSheet,
+    current_page: i32,
 
     const Self = @This();
 
@@ -609,5 +610,6 @@ fn newDwarfInChainmailWithTwoHandedAx(name: []const u8) Player {
                 },
             },
         },
+        .current_page = 57,
     };
 }
