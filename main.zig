@@ -105,13 +105,17 @@ const GameState = struct {
             try writer.print("Neither player lands a hit. No damage dealt.\n", .{});
         }
         // update move restrictions for the next turn
+        // TODO
         // update game status, game is over if either playre is out of body points
         if (self.player1.sheet.current_body_points <= 0 and self.player2.sheet.current_body_points <= 0) {
             self.status = .DRAW;
+            try writer.print("Game over! Result: draw.\n", .{});
         } else if (self.player1.sheet.current_body_points <= 0) {
             self.status = .PLAYER2_VICTORY;
+            try writer.print("Game over! Result: player 2 wins\n", .{});
         } else if (self.player2.sheet.current_body_points <= 0) {
             self.status = .PLAYER1_VICTORY;
+            try writer.print("Game over! Result: player 1 wins\n", .{});
         }
     }
 };
