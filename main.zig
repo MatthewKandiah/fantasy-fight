@@ -9,7 +9,7 @@ pub fn main() void {
     const player1 = Player.init("Alfred");
     const player2 = Player.init("Bob");
 
-    const game = GameState.init(
+    var game = GameState.init(
         player1,
         player2,
     );
@@ -23,7 +23,7 @@ pub fn main() void {
         while (!valid_choice_player1) {
             stdout.print("Player 1 > ", .{}) catch fatal("Print failure");
             player1_choice = std.fmt.parseInt(i32, stdin.readUntilDelimiter(&stdin_buf, '\n') catch fatal("Unexpected failure reading player 1 input"), 10) catch -1;
-            if (player1_choice >= 0 and player1_choice < player1.character_sheet.maneuvers.len and player1.isManeuverAllowed(player1.getManeuver(player1_choice))) {
+            if (player1_choice >= 0 and player1_choice < player1.sheet.maneuvers.len and player1.isManeuverAllowed(player1.getManeuver(player1_choice))) {
                 valid_choice_player1 = true;
             } else {
                 stdout.print("Invalid choice, please try again\n", .{}) catch fatal("Print failure");
@@ -38,16 +38,18 @@ pub fn main() void {
         while (!valid_choice_player2) {
             stdout.print("Player 2 >", .{}) catch fatal("Print failure");
             player2_choice = std.fmt.parseInt(i32, stdin.readUntilDelimiter(&stdin_buf, '\n') catch fatal("Unexpected failure reading player 2 input"), 10) catch -1;
-            if (player2_choice >= 0 and player2_choice < player2.character_sheet.maneuvers.len and player2.isManeuverAllowed(player2.getManeuver(player2_choice))) {
+            if (player2_choice >= 0 and player2_choice < player2.sheet.maneuvers.len and player2.isManeuverAllowed(player2.getManeuver(player2_choice))) {
                 valid_choice_player2 = true;
             } else {
                 stdout.print("Invalid choice, please try again\n", .{}) catch fatal("Print failure");
             }
         }
 
-        _ = stdout.print("Player 1 chose {s}!\n", .{player1.getManeuver(player1_choice).toString(&stdout_buf) catch fatal("Failed to print player 1 maneuver")}) catch {};
-        _ = stdout.print("Player 2 chose {s}!\n", .{player2.getManeuver(player2_choice).toString(&stdout_buf) catch fatal("Failed to print player 2 maneuver")}) catch {};
-        break;
+        const player1_maneuver = player1.getManeuver(player1_choice);
+        const player2_maneuver = player2.getManeuver(player2_choice);
+        _ = stdout.print("Player 1 chose {s}!\n", .{player1_maneuver.toString(&stdout_buf) catch fatal("Failed to print player 1 maneuver")}) catch {};
+        _ = stdout.print("Player 2 chose {s}!\n", .{player2_maneuver.toString(&stdout_buf) catch fatal("Failed to print player 2 maneuver")}) catch {};
+        game.update(player1_maneuver, player2_maneuver, stdout) catch fatal("Unexpected failure during game state update");
     }
 }
 
@@ -72,10 +74,45 @@ const GameState = struct {
         };
     }
 
-    fn update(self: *Self, player1_maneuver: Maneuver, player2_maneuver: Maneuver) void {
-        _ = self;
-        _ = player1_maneuver;
-        _ = player2_maneuver;
+    fn update(self: *Self, player1_maneuver: Maneuver, player2_maneuver: Maneuver, writer: std.fs.File.Writer) !void {
+        // both players turn to the page on their chosen maneuver
+        // both players check which page their opponent's maneuver sends them to
+        self.player1.current_page = try self.player1.getMovementParchment(player1_maneuver.pg).get(player2_maneuver.pg);
+        self.player2.current_page = try self.player2.getMovementParchment(player2_maneuver.pg).get(player1_maneuver.pg);
+        // if either player has a picture scroll with a defined score, calculate how much damage has been dealt
+        // TODO - make results print more nicely, include the picture scroll names in them
+        if (self.player1.getPictureScroll(self.player1.current_page).score) |score| {
+            var result: i32 = score;
+            result += player2_maneuver.mod;
+            switch (player2_maneuver.colour) {
+                .ORANGE, .RED => result += self.player2.sheet.height - self.player1.sheet.height,
+                else => {},
+            }
+            try writer.print("Player 2 lands a hit! Player 1 takes {} damage.\n", .{result});
+            self.player1.sheet.current_body_points -= result;
+        }
+        if (self.player2.getPictureScroll(self.player2.current_page).score) |score| {
+            var result: i32 = score;
+            result += player1_maneuver.mod;
+            switch (player1_maneuver.colour) {
+                .ORANGE, .RED => result += self.player1.sheet.height - self.player2.sheet.height,
+                else => {},
+            }
+            try writer.print("Player 1 lands a hit! Player 2 takes {} damage.\n", .{result});
+            self.player2.sheet.current_body_points -= result;
+        }
+        if (self.player1.getPictureScroll(self.player2.current_page).score == undefined and self.player2.getPictureScroll(self.player1.current_page).score == undefined) {
+            try writer.print("Neither player lands a hit. No damage dealt.\n", .{});
+        }
+        // update move restrictions for the next turn
+        // update game status, game is over if either playre is out of body points
+        if (self.player1.sheet.current_body_points <= 0 and self.player2.sheet.current_body_points <= 0) {
+            self.status = .DRAW;
+        } else if (self.player1.sheet.current_body_points <= 0) {
+            self.status = .PLAYER2_VICTORY;
+        } else if (self.player2.sheet.current_body_points <= 0) {
+            self.status = .PLAYER1_VICTORY;
+        }
     }
 };
 
@@ -87,8 +124,8 @@ const GameStatus = enum {
 };
 
 const Player = struct {
-    character_booklet: CharacterBooklet,
-    character_sheet: CharacterSheet,
+    booklet: CharacterBooklet,
+    sheet: CharacterSheet,
     current_page: i32,
     required_maneuver_types: [ManeuverType.field_count]bool,
     forbidden_maneuver_types: [ManeuverType.field_count]bool,
@@ -99,8 +136,8 @@ const Player = struct {
 
     fn init(name: []const u8) Self {
         return Self{
-            .character_booklet = dwarfInChainmailWithTwoHandedAxBooklet,
-            .character_sheet = dwarfInChainmailWithTwoHandedAxSheet(name),
+            .booklet = dwarfInChainmailWithTwoHandedAxBooklet,
+            .sheet = dwarfInChainmailWithTwoHandedAxSheet(name),
             .current_page = 57,
             .required_maneuver_types = ManeuverType.initial_required,
             .forbidden_maneuver_types = ManeuverType.initial_forbidden,
@@ -110,7 +147,7 @@ const Player = struct {
     }
 
     fn getManeuver(self: Self, index: i32) Maneuver {
-        return self.character_sheet.maneuvers[@intCast(index)];
+        return self.sheet.maneuvers[@intCast(index)];
     }
 
     fn isManeuverAllowed(self: Self, maneuver: Maneuver) bool {
@@ -137,7 +174,7 @@ const Player = struct {
 
     fn printManeuvers(self: Self, writer: std.fs.File.Writer) !void {
         var man_string_buf: [256]u8 = undefined;
-        for (self.character_sheet.maneuvers, 0..) |maneuver, i| {
+        for (self.sheet.maneuvers, 0..) |maneuver, i| {
             const maneuver_string = try maneuver.toString(&man_string_buf);
             const maneuver_allowed = self.isManeuverAllowed(maneuver);
             try writer.print("{d: >2}. ", .{i});
@@ -148,6 +185,16 @@ const Player = struct {
             }
             try writer.print("{s}\n", .{maneuver_string});
         }
+    }
+
+    fn getMovementParchment(self: Self, page_num: i32) MovementParchment {
+        const index: usize = @intCast(@divFloor(page_num, 2) - 1);
+        return self.booklet.movement_parchments[index];
+    }
+
+    fn getPictureScroll(self: Self, page_num: i32) PictureScroll {
+        const index: usize = @intCast(@divFloor(page_num, 2));
+        return self.booklet.picture_scrolls[index];
     }
 };
 
@@ -166,10 +213,10 @@ const MovementParchment = struct {
         if (page <= 0) {
             return error.NegativeOrZeroMovementPage;
         }
-        if (page % 2 != 0) {
+        if (@mod(page, 2) != 0) {
             return error.OddMovementPage;
         }
-        const value = self.values[(page / 2) - 1];
+        const value = self.values[@intCast(@divFloor(page, 2) - 1)];
         if (value == -1) {
             return error.InvalidMovementPage;
         }
@@ -776,8 +823,8 @@ fn dwarfInChainmailWithTwoHandedAxSheet(name: []const u8) CharacterSheet {
 
 fn newDwarfInChainmailWithTwoHandedAx(name: []const u8) Player {
     return Player{
-        .character_booklet = dwarfInChainmailWithTwoHandedAxBooklet,
-        .character_sheet = dwarfInChainmailWithTwoHandedAxSheet(name),
+        .booklet = dwarfInChainmailWithTwoHandedAxBooklet,
+        .sheet = dwarfInChainmailWithTwoHandedAxSheet(name),
         .current_page = 57,
         .required_maneuver_types = ManeuverType.initial_required,
         .forbidden_maneuver_types = ManeuverType.initial_forbidden,
