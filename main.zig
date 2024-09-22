@@ -173,6 +173,19 @@ const ManeuverColour = enum {
     const initial_required = [Self.field_count]bool{ false, false, false, false, false, false, false, false };
 
     const initial_forbidden = [Self.field_count]bool{ false, false, false, false, false, false, false, false };
+
+    fn toString(self: Self) []const u8 {
+        return switch (self) {
+            .ORANGE => "Orange",
+            .RED => "Red",
+            .BLUE => "Blue",
+            .YELLOW => "Yellow",
+            .GREEN => "Green",
+            .WHITE => "White",
+            .BLACK => "Black",
+            .BROWN => "Brown",
+        };
+    }
 };
 
 const ManeuverType = enum {
@@ -190,6 +203,17 @@ const ManeuverType = enum {
     const initial_required = [Self.field_count]bool{ true, false, false, false, false, false };
 
     const initial_forbidden = [Self.field_count]bool{ false, false, false, false, false, false };
+
+    fn toString(self: Self) []const u8 {
+        return switch (self) {
+            .EXTENDED_RANGE => "Extended Range",
+            .DOWN_SWING => "Down Swing",
+            .SIDE_SWING => "Side Swing",
+            .THRUST => "Thrust",
+            .SPECIAL => "Special",
+            .JUMP => "Jump",
+        };
+    }
 };
 
 const dwarfInChainmailWithTwoHandedAxBooklet: CharacterBooklet = .{
