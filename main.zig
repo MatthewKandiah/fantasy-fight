@@ -1,8 +1,10 @@
 const std = @import("std");
 
-pub fn main() !void {
-    var stdin_buf: [1024]u8 = undefined;
+pub fn main() void {
+    const stdin_buf: [1024]u8 = undefined;
+    _ = stdin_buf;
     const stdin = std.io.getStdIn().reader();
+    _ = stdin;
     const stdout = std.io.getStdOut().writer();
 
     const player1 = Player.init("Alfred");
@@ -14,9 +16,7 @@ pub fn main() !void {
     );
 
     while (game.status == .IN_PROGRESS) {
-        // example using stdin and stdout
-        const input = stdin.readUntilDelimiter(&stdin_buf, '\n') catch fatal("Bad stdin read");
-        stdout.print("Input: {s}\n", .{input}) catch fatal("Failed stdout print");
+        player1.printManeuvers(stdout) catch fatal("Unexpected failure printing player 1 maneuvers");
         break;
     }
 }
@@ -27,7 +27,6 @@ fn fatal(message: []const u8) noreturn {
     std.process.exit(1);
 }
 
-// TODO - allowed and forbidden maneuver type and maneuver colour for each player
 const GameState = struct {
     player1: Player,
     player2: Player,
@@ -48,7 +47,6 @@ const GameState = struct {
         _ = player1_maneuver;
         _ = player2_maneuver;
     }
-    // TODO - calculate available options, print them to stdout, get player choice from stdin, update game state
 };
 
 const GameStatus = enum {
@@ -102,6 +100,21 @@ const Player = struct {
         }
         return true;
     }
+
+    fn printManeuvers(self: Self, writer: std.fs.File.Writer) !void {
+        var man_string_buf: [256]u8 = undefined;
+        for (self.character_sheet.maneuvers, 0..) |maneuver, i| {
+            const maneuver_string = try maneuver.toString(&man_string_buf);
+            const maneuver_allowed = self.isManeuverAllowed(maneuver);
+            try writer.print("{d: >2}. ", .{i});
+            if (!maneuver_allowed) {
+                try writer.print("Disabled\t", .{});
+            } else {
+                try writer.print("\t\t", .{});
+            }
+            try writer.print("{s}\n", .{maneuver_string});
+        }
+    }
 };
 
 const CharacterBooklet = struct {
@@ -154,6 +167,12 @@ const Maneuver = struct {
     mod: i32,
     colour: ManeuverColour,
     type: ManeuverType,
+
+    const Self = @This();
+
+    fn toString(self: Self, buf: []u8) ![]const u8 {
+        return std.fmt.bufPrint(buf, "{s} {s}", .{ self.type.toString(), self.name });
+    }
 };
 
 const ManeuverColour = enum {
