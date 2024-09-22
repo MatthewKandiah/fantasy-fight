@@ -1,10 +1,9 @@
 const std = @import("std");
 
 pub fn main() void {
-    const stdin_buf: [1024]u8 = undefined;
-    _ = stdin_buf;
+    var stdin_buf: [1024]u8 = undefined;
+    var stdout_buf: [1024]u8 = undefined;
     const stdin = std.io.getStdIn().reader();
-    _ = stdin;
     const stdout = std.io.getStdOut().writer();
 
     const player1 = Player.init("Alfred");
@@ -16,7 +15,38 @@ pub fn main() void {
     );
 
     while (game.status == .IN_PROGRESS) {
+        stdout.print("Player 1, choose your maneuver:\n", .{}) catch fatal("Print failure");
         player1.printManeuvers(stdout) catch fatal("Unexpected failure printing player 1 maneuvers");
+
+        var valid_choice_player1 = false;
+        var player1_choice: i32 = undefined;
+        while (!valid_choice_player1) {
+            stdout.print("Player 1 > ", .{}) catch fatal("Print failure");
+            player1_choice = std.fmt.parseInt(i32, stdin.readUntilDelimiter(&stdin_buf, '\n') catch fatal("Unexpected failure reading player 1 input"), 10) catch -1;
+            if (player1_choice >= 0 and player1_choice < player1.character_sheet.maneuvers.len) {
+                valid_choice_player1 = true;
+            } else {
+                stdout.print("Invalid choice, please try again\n", .{}) catch fatal("Print failure");
+            }
+        }
+
+        stdout.print("Player 2, choose your maneuver:\n", .{}) catch fatal("Print failure");
+        player2.printManeuvers(stdout) catch fatal("Unexpected failure printing player 2 maneuvers");
+
+        var valid_choice_player2 = false;
+        var player2_choice: i32 = undefined;
+        while (!valid_choice_player2) {
+            stdout.print("Player 2 >", .{}) catch fatal("Print failure");
+            player2_choice = std.fmt.parseInt(i32, stdin.readUntilDelimiter(&stdin_buf, '\n') catch fatal("Unexpected failure reading player 2 input"), 10) catch -1;
+            if (player2_choice >= 0 and player2_choice < player2.character_sheet.maneuvers.len) {
+                valid_choice_player2 = true;
+            } else {
+                stdout.print("Invalid choice, please try again\n", .{}) catch fatal("Print failure");
+            }
+        }
+
+        _ = stdout.print("Player 1 chose {s}!\n", .{player1.character_sheet.maneuvers[@intCast(player1_choice)].toString(&stdout_buf) catch fatal("Unexpected failure printing player 1 chosen maneuver")}) catch {};
+        _ = stdout.print("Player 2 chose {s}!\n", .{player2.character_sheet.maneuvers[@intCast(player2_choice)].toString(&stdout_buf) catch fatal("Unexpected failure printing player 2 chosen maneuver")}) catch {};
         break;
     }
 }
