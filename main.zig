@@ -1,6 +1,10 @@
 const std = @import("std");
 
-pub fn main() void {
+pub fn main() !void {
+    var stdin_buf: [64]u8 = undefined;
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.getStdOut().writer();
+
     const player1 = Player.init("Alfred");
     const player2 = Player.init("Bob");
 
@@ -10,7 +14,12 @@ pub fn main() void {
     );
 
     while (game.status == .IN_PROGRESS) {
-        // game loop
+        // present player 1's maneuvers and get choice
+        const input = stdin.readUntilDelimiterOrEof(&stdin_buf, '\n') catch std.process.exit(1) orelse "";
+        _ = stdout.write("Input: ") catch std.process.exit(1);
+        _ = stdout.write(input) catch std.process.exit(1);
+        _ = stdout.write("\n") catch std.process.exit(1);
+        // present player 2's maneuvers and get choice
         break;
     }
 }
