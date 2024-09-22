@@ -6,9 +6,6 @@ pub fn main() void {
     const stdin = std.io.getStdIn().reader();
     const stdout = std.io.getStdOut().writer();
 
-    const player1 = Player.init("Alfred");
-    const player2 = Player.init("Bob");
-
     var game = GameState.init(
         Player.init("Alfred"),
         Player.init("Bob"),
@@ -17,14 +14,14 @@ pub fn main() void {
     while (game.status == .IN_PROGRESS) {
         stdout.print("\nPlayer 1 health: {}/{}\nPlayer 2 health: {}/{}\n", .{ game.player1.sheet.current_body_points, game.player1.sheet.starting_body_points, game.player2.sheet.current_body_points, game.player2.sheet.starting_body_points }) catch fatal("Print failure");
         stdout.print("Player 1, choose your maneuver:\n", .{}) catch fatal("Print failure");
-        player1.printManeuvers(stdout) catch fatal("Unexpected failure printing player 1 maneuvers");
+        game.player1.printManeuvers(stdout) catch fatal("Unexpected failure printing player 1 maneuvers");
 
         var valid_choice_player1 = false;
         var player1_choice: i32 = undefined;
         while (!valid_choice_player1) {
             stdout.print("Player 1 > ", .{}) catch fatal("Print failure");
             player1_choice = std.fmt.parseInt(i32, stdin.readUntilDelimiter(&stdin_buf, '\n') catch fatal("Unexpected failure reading player 1 input"), 10) catch -1;
-            if (player1_choice >= 0 and player1_choice < player1.sheet.maneuvers.len and player1.isManeuverAllowed(player1.getManeuver(player1_choice))) {
+            if (player1_choice >= 0 and player1_choice < game.player1.sheet.maneuvers.len and game.player1.isManeuverAllowed(game.player1.getManeuver(player1_choice))) {
                 valid_choice_player1 = true;
             } else {
                 stdout.print("Invalid choice, please try again\n", .{}) catch fatal("Print failure");
@@ -32,22 +29,22 @@ pub fn main() void {
         }
 
         stdout.print("Player 2, choose your maneuver:\n", .{}) catch fatal("Print failure");
-        player2.printManeuvers(stdout) catch fatal("Unexpected failure printing player 2 maneuvers");
+        game.player2.printManeuvers(stdout) catch fatal("Unexpected failure printing player 2 maneuvers");
 
         var valid_choice_player2 = false;
         var player2_choice: i32 = undefined;
         while (!valid_choice_player2) {
             stdout.print("Player 2 >", .{}) catch fatal("Print failure");
             player2_choice = std.fmt.parseInt(i32, stdin.readUntilDelimiter(&stdin_buf, '\n') catch fatal("Unexpected failure reading player 2 input"), 10) catch -1;
-            if (player2_choice >= 0 and player2_choice < player2.sheet.maneuvers.len and player2.isManeuverAllowed(player2.getManeuver(player2_choice))) {
+            if (player2_choice >= 0 and player2_choice < game.player2.sheet.maneuvers.len and game.player2.isManeuverAllowed(game.player2.getManeuver(player2_choice))) {
                 valid_choice_player2 = true;
             } else {
                 stdout.print("Invalid choice, please try again\n", .{}) catch fatal("Print failure");
             }
         }
 
-        const player1_maneuver = player1.getManeuver(player1_choice);
-        const player2_maneuver = player2.getManeuver(player2_choice);
+        const player1_maneuver = game.player1.getManeuver(player1_choice);
+        const player2_maneuver = game.player2.getManeuver(player2_choice);
         _ = stdout.print("Player 1 chose {s}!\n", .{player1_maneuver.toString(&stdout_buf) catch fatal("Failed to print player 1 maneuver")}) catch {};
         _ = stdout.print("Player 2 chose {s}!\n", .{player2_maneuver.toString(&stdout_buf) catch fatal("Failed to print player 2 maneuver")}) catch {};
         game.update(player1_maneuver, player2_maneuver, stdout) catch fatal("Unexpected failure during game state update");
