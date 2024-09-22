@@ -10,11 +10,12 @@ pub fn main() void {
     const player2 = Player.init("Bob");
 
     var game = GameState.init(
-        player1,
-        player2,
+        Player.init("Alfred"),
+        Player.init("Bob"),
     );
 
     while (game.status == .IN_PROGRESS) {
+        stdout.print("\nPlayer 1 health: {}/{}\nPlayer 2 health: {}/{}\n", .{ game.player1.sheet.current_body_points, game.player1.sheet.starting_body_points, game.player2.sheet.current_body_points, game.player2.sheet.starting_body_points }) catch fatal("Print failure");
         stdout.print("Player 1, choose your maneuver:\n", .{}) catch fatal("Print failure");
         player1.printManeuvers(stdout) catch fatal("Unexpected failure printing player 1 maneuvers");
 
@@ -88,6 +89,7 @@ const GameState = struct {
                 .ORANGE, .RED => result += self.player2.sheet.height - self.player1.sheet.height,
                 else => {},
             }
+            result = @max(result, 0);
             try writer.print("Player 2 lands a hit! Player 1 takes {} damage.\n", .{result});
             self.player1.sheet.current_body_points -= result;
         }
@@ -98,6 +100,7 @@ const GameState = struct {
                 .ORANGE, .RED => result += self.player1.sheet.height - self.player2.sheet.height,
                 else => {},
             }
+            result = @max(result, 0);
             try writer.print("Player 1 lands a hit! Player 2 takes {} damage.\n", .{result});
             self.player2.sheet.current_body_points -= result;
         }
