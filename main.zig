@@ -23,7 +23,7 @@ pub fn main() void {
         while (!valid_choice_player1) {
             stdout.print("Player 1 > ", .{}) catch fatal("Print failure");
             player1_choice = std.fmt.parseInt(i32, stdin.readUntilDelimiter(&stdin_buf, '\n') catch fatal("Unexpected failure reading player 1 input"), 10) catch -1;
-            if (player1_choice >= 0 and player1_choice < player1.character_sheet.maneuvers.len) {
+            if (player1_choice >= 0 and player1_choice < player1.character_sheet.maneuvers.len and player1.isManeuverAllowed(player1.getManeuver(player1_choice))) {
                 valid_choice_player1 = true;
             } else {
                 stdout.print("Invalid choice, please try again\n", .{}) catch fatal("Print failure");
@@ -38,15 +38,15 @@ pub fn main() void {
         while (!valid_choice_player2) {
             stdout.print("Player 2 >", .{}) catch fatal("Print failure");
             player2_choice = std.fmt.parseInt(i32, stdin.readUntilDelimiter(&stdin_buf, '\n') catch fatal("Unexpected failure reading player 2 input"), 10) catch -1;
-            if (player2_choice >= 0 and player2_choice < player2.character_sheet.maneuvers.len) {
+            if (player2_choice >= 0 and player2_choice < player2.character_sheet.maneuvers.len and player2.isManeuverAllowed(player2.getManeuver(player2_choice))) {
                 valid_choice_player2 = true;
             } else {
                 stdout.print("Invalid choice, please try again\n", .{}) catch fatal("Print failure");
             }
         }
 
-        _ = stdout.print("Player 1 chose {s}!\n", .{player1.character_sheet.maneuvers[@intCast(player1_choice)].toString(&stdout_buf) catch fatal("Unexpected failure printing player 1 chosen maneuver")}) catch {};
-        _ = stdout.print("Player 2 chose {s}!\n", .{player2.character_sheet.maneuvers[@intCast(player2_choice)].toString(&stdout_buf) catch fatal("Unexpected failure printing player 2 chosen maneuver")}) catch {};
+        _ = stdout.print("Player 1 chose {s}!\n", .{player1.getManeuver(player1_choice).toString(&stdout_buf) catch fatal("Failed to print player 1 maneuver")}) catch {};
+        _ = stdout.print("Player 2 chose {s}!\n", .{player2.getManeuver(player2_choice).toString(&stdout_buf) catch fatal("Failed to print player 2 maneuver")}) catch {};
         break;
     }
 }
@@ -107,6 +107,10 @@ const Player = struct {
             .required_maneuver_colours = ManeuverColour.initial_required,
             .forbidden_maneuver_colours = ManeuverColour.initial_forbidden,
         };
+    }
+
+    fn getManeuver(self: Self, index: i32) Maneuver {
+        return self.character_sheet.maneuvers[@intCast(index)];
     }
 
     fn isManeuverAllowed(self: Self, maneuver: Maneuver) bool {
