@@ -104,6 +104,15 @@ const GameState = struct {
         if (self.player1.getPictureScroll(self.player2.current_page).score == undefined and self.player2.getPictureScroll(self.player1.current_page).score == undefined) {
             try writer.print("Neither player lands a hit. No damage dealt.\n", .{});
         }
+        // clear last turn's temporary restrictions
+        self.player1.required_maneuver_types_temp = ManeuverType.all_false_map;
+        self.player1.forbidden_maneuver_types_temp = ManeuverType.all_false_map;
+        self.player1.required_maneuver_colours_temp = ManeuverColour.all_false_map;
+        self.player1.forbidden_maneuver_colours_temp = ManeuverColour.all_false_map;
+        self.player2.required_maneuver_types_temp = ManeuverType.all_false_map;
+        self.player2.forbidden_maneuver_types_temp = ManeuverType.all_false_map;
+        self.player2.required_maneuver_colours_temp = ManeuverColour.all_false_map;
+        self.player2.forbidden_maneuver_colours_temp = ManeuverColour.all_false_map;
         // update move restrictions for the next turn
         // TODO
         // update game status, game is over if either playre is out of body points
@@ -131,10 +140,14 @@ const Player = struct {
     booklet: CharacterBooklet,
     sheet: CharacterSheet,
     current_page: i32,
-    required_maneuver_types: [ManeuverType.field_count]bool,
-    forbidden_maneuver_types: [ManeuverType.field_count]bool,
-    required_maneuver_colours: [ManeuverColour.field_count]bool,
-    forbidden_maneuver_colours: [ManeuverColour.field_count]bool,
+    required_maneuver_types_temp: [ManeuverType.field_count]bool,
+    forbidden_maneuver_types_temp: [ManeuverType.field_count]bool,
+    required_maneuver_colours_temp: [ManeuverColour.field_count]bool,
+    forbidden_maneuver_colours_temp: [ManeuverColour.field_count]bool,
+    required_maneuver_types_perm: [ManeuverType.field_count]bool,
+    forbidden_maneuver_types_perm: [ManeuverType.field_count]bool,
+    required_maneuver_colours_perm: [ManeuverColour.field_count]bool,
+    forbidden_maneuver_colours_perm: [ManeuverColour.field_count]bool,
 
     const Self = @This();
 
@@ -143,10 +156,14 @@ const Player = struct {
             .booklet = dwarfInChainmailWithTwoHandedAxBooklet,
             .sheet = dwarfInChainmailWithTwoHandedAxSheet(name),
             .current_page = 57,
-            .required_maneuver_types = ManeuverType.initial_required,
-            .forbidden_maneuver_types = ManeuverType.initial_forbidden,
-            .required_maneuver_colours = ManeuverColour.initial_required,
-            .forbidden_maneuver_colours = ManeuverColour.initial_forbidden,
+            .required_maneuver_types_temp = ManeuverType.initial_required_temp,
+            .forbidden_maneuver_types_temp = ManeuverType.initial_forbidden_temp,
+            .required_maneuver_colours_temp = ManeuverColour.initial_required_temp,
+            .forbidden_maneuver_colours_temp = ManeuverColour.initial_forbidden_temp,
+            .required_maneuver_types_perm = ManeuverType.initial_required_perm,
+            .forbidden_maneuver_types_perm = ManeuverType.initial_forbidden_perm,
+            .required_maneuver_colours_perm = ManeuverColour.initial_required_perm,
+            .forbidden_maneuver_colours_perm = ManeuverColour.initial_forbidden_perm,
         };
     }
 
@@ -158,18 +175,18 @@ const Player = struct {
         const candidate_type_index = @intFromEnum(maneuver.type);
         const candidate_colour_index = @intFromEnum(maneuver.colour);
         for (0..ManeuverType.field_count) |i| {
-            if (i == candidate_type_index and self.forbidden_maneuver_types[i]) {
+            if (i == candidate_type_index and (self.forbidden_maneuver_types_temp[i] or self.forbidden_maneuver_types_perm[i])) {
                 return false;
             }
-            if (i != candidate_type_index and self.required_maneuver_types[i]) {
+            if (i != candidate_type_index and (self.required_maneuver_types_temp[i] or self.required_maneuver_types_perm[i])) {
                 return false;
             }
         }
         for (0..ManeuverColour.field_count) |i| {
-            if (i == candidate_colour_index and self.forbidden_maneuver_colours[i]) {
+            if (i == candidate_colour_index and (self.forbidden_maneuver_colours_temp[i] or self.forbidden_maneuver_colours_perm[i])) {
                 return false;
             }
-            if (i != candidate_colour_index and self.required_maneuver_colours[i]) {
+            if (i != candidate_colour_index and (self.required_maneuver_colours_temp[i] or self.required_maneuver_colours_perm[i])) {
                 return false;
             }
         }
@@ -230,7 +247,8 @@ const MovementParchment = struct {
 
 const PictureScroll = struct {
     name: []const u8,
-    // TODO - implement opponent restrictions
+    // TODO
+    // opponent_restriction: fn (*GameState) void,
     pg: i32,
     score: ?i32,
 };
@@ -274,9 +292,15 @@ const ManeuverColour = enum {
 
     const field_count = @typeInfo(Self).Enum.fields.len;
 
-    const initial_required = [Self.field_count]bool{ false, false, false, false, false, false, false, false };
+    const all_false_map: [Self.field_count]bool = .{false} ** Self.field_count;
 
-    const initial_forbidden = [Self.field_count]bool{ false, false, false, false, false, false, false, false };
+    const initial_required_temp = [Self.field_count]bool{ false, false, false, false, false, false, false, false };
+
+    const initial_required_perm = [Self.field_count]bool{ false, false, false, false, false, false, false, false };
+
+    const initial_forbidden_temp = [Self.field_count]bool{ false, false, false, false, false, false, false, false };
+
+    const initial_forbidden_perm = [Self.field_count]bool{ false, false, false, false, false, false, false, false };
 
     fn toString(self: Self) []const u8 {
         return switch (self) {
@@ -304,9 +328,15 @@ const ManeuverType = enum {
 
     const field_count = @typeInfo(Self).Enum.fields.len;
 
-    const initial_required = [Self.field_count]bool{ true, false, false, false, false, false };
+    const all_false_map: [Self.field_count]bool = .{false} ** Self.field_count;
 
-    const initial_forbidden = [Self.field_count]bool{ false, false, false, false, false, false };
+    const initial_required_temp = [Self.field_count]bool{ true, false, false, false, false, false };
+
+    const initial_required_perm = [Self.field_count]bool{ false, false, false, false, false, false };
+
+    const initial_forbidden_temp = [Self.field_count]bool{ false, false, false, false, false, false };
+
+    const initial_forbidden_perm = [Self.field_count]bool{ false, false, false, false, false, false };
 
     fn toString(self: Self) []const u8 {
         return switch (self) {
