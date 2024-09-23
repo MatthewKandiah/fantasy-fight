@@ -57,6 +57,8 @@ fn fatal(message: []const u8) noreturn {
     std.process.exit(1);
 }
 
+// TODO - support temporary and permanent score modifications
+// TODO - support temporary and permanent exceptions for particular moves for required/forbidden colour/type/score modification
 const GameState = struct {
     player1: Player,
     player2: Player,
@@ -79,7 +81,9 @@ const GameState = struct {
         self.player2.current_page = try self.player2.getMovementParchment(player2_maneuver.pg).get(player1_maneuver.pg);
         // if either player has a picture scroll with a defined score, calculate how much damage has been dealt
         // TODO - make results print more nicely, include the picture scroll names in them
-        if (self.player1.getPictureScroll(self.player1.current_page).score) |score| {
+        const player1_picture_scroll = self.player1.getPictureScroll(self.player1.current_page);
+        const player2_picture_scroll = self.player2.getPictureScroll(self.player2.current_page);
+        if (player1_picture_scroll.score) |score| {
             var result: i32 = score;
             result += player2_maneuver.mod;
             switch (player2_maneuver.colour) {
@@ -90,7 +94,7 @@ const GameState = struct {
             try writer.print("Player 2 lands a hit! Player 1 takes {} damage.\n", .{result});
             self.player1.sheet.current_body_points -= result;
         }
-        if (self.player2.getPictureScroll(self.player2.current_page).score) |score| {
+        if (player2_picture_scroll.score) |score| {
             var result: i32 = score;
             result += player1_maneuver.mod;
             switch (player1_maneuver.colour) {
@@ -101,7 +105,7 @@ const GameState = struct {
             try writer.print("Player 1 lands a hit! Player 2 takes {} damage.\n", .{result});
             self.player2.sheet.current_body_points -= result;
         }
-        if (self.player1.getPictureScroll(self.player2.current_page).score == undefined and self.player2.getPictureScroll(self.player1.current_page).score == undefined) {
+        if (player1_picture_scroll.score == undefined and player2_picture_scroll.score == undefined) {
             try writer.print("Neither player lands a hit. No damage dealt.\n", .{});
         }
         // clear last turn's temporary restrictions
@@ -113,8 +117,11 @@ const GameState = struct {
         self.player2.forbidden_maneuver_types_temp = ManeuverType.all_false_map;
         self.player2.required_maneuver_colours_temp = ManeuverColour.all_false_map;
         self.player2.forbidden_maneuver_colours_temp = ManeuverColour.all_false_map;
+
         // update move restrictions for the next turn
-        // TODO
+        player1_picture_scroll.restriction(&self.player1);
+        player2_picture_scroll.restriction(&self.player2);
+
         // update game status, game is over if either playre is out of body points
         if (self.player1.sheet.current_body_points <= 0 and self.player2.sheet.current_body_points <= 0) {
             self.status = .DRAW;
@@ -217,6 +224,38 @@ const Player = struct {
         const index: usize = @intCast(@divFloor(page_num, 2));
         return self.booklet.picture_scrolls[index];
     }
+
+    fn setTempRequiredType(self: *Self, man_type: ManeuverType) void {
+        self.required_maneuver_types_temp[@intFromEnum(man_type)] = true;
+    }
+
+    fn setPermRequiredType(self: *Self, man_type: ManeuverType) void {
+        self.required_maneuver_types_perm[@intFromEnum(man_type)] = true;
+    }
+
+    fn setTempForbiddenType(self: *Self, man_type: ManeuverType) void {
+        self.forbidden_maneuver_types_temp[@intFromEnum(man_type)] = true;
+    }
+
+    fn setPermForbiddenType(self: *Self, man_type: ManeuverType) void {
+        self.forbidden_maneuver_types_perm[@intFromEnum(man_type)] = true;
+    }
+
+    fn setTempRequiredColour(self: *Self, colour: ManeuverColour) void {
+        self.required_maneuver_colours_temp[@intFromEnum(colour)] = true;
+    }
+
+    fn setPermRequiredColour(self: *Self, colour: ManeuverColour) void {
+        self.required_maneuver_colours_perm[@intFromEnum(colour)] = true;
+    }
+
+    fn setTempForbiddenColour(self: *Self, colour: ManeuverColour) void {
+        self.forbidden_maneuver_colours_temp[@intFromEnum(colour)] = true;
+    }
+
+    fn setPermForbiddenColour(self: *Self, colour: ManeuverColour) void {
+        self.forbidden_maneuver_colours_perm[@intFromEnum(colour)] = true;
+    }
 };
 
 const CharacterBooklet = struct {
@@ -247,8 +286,7 @@ const MovementParchment = struct {
 
 const PictureScroll = struct {
     name: []const u8,
-    // TODO
-    // opponent_restriction: fn (*GameState) void,
+    restriction: *const fn (*Player) void,
     pg: i32,
     score: ?i32,
 };
@@ -486,161 +524,193 @@ const dwarfInChainmailWithTwoHandedAxBooklet: CharacterBooklet = .{
             .name = "Jumping Away",
             .pg = 1,
             .score = null,
+            .restriction = noExtendedRangeNextTurn, // TODO - score adjustment
         },
         PictureScroll{
             .name = "Swinging High",
             .pg = 3,
             .score = null,
+            .restriction = noThrustsOrRedsNextTurn,
         },
         PictureScroll{
             .name = "Swinging Low",
             .pg = 5,
             .score = null,
+            .restriction = noThrustsOrBluesNextTurn,
         },
         PictureScroll{
             .name = "Dazed",
             .pg = 7,
             .score = 6,
+            .restriction = onlyJumpsNextTurn,
         },
         PictureScroll{
             .name = "Hooking Shield",
             .pg = 9,
             .score = null,
+            .restriction = noBluesNextTurn, // TODO - page change
         },
         PictureScroll{
             .name = "Hooking Leg",
             .pg = 11,
             .score = null,
+            .restriction = noRedsOrOrangesNextTurn, // TODO - page change
         },
         PictureScroll{
             .name = "Leg Wound",
             .pg = 13,
             .score = 3,
+            .restriction = noRedsOrOrangesNextTurn,
         },
         PictureScroll{
             .name = "Swinging Down",
             .pg = 15,
             .score = null,
+            .restriction = noBluesNextTurn,
         },
         PictureScroll{
             .name = "Kicked Off Balance",
             .pg = 17,
             .score = 0,
+            .restriction = onlyGreensOrYellowsNextTurn,
         },
         PictureScroll{
             .name = "Knocked Off Balance",
             .pg = 19,
             .score = 0,
+            .restriction = onlyGreensOrYellowsNextTurn,
         },
         PictureScroll{
             .name = "Turned Around",
             .pg = 21,
             .score = 0,
+            .restriction = onlyYellowsNextTurn,
         },
         PictureScroll{
             .name = "Behind You",
             .pg = 23,
             .score = null,
+            .restriction = noExtendedRangeNextTurn,
         },
         PictureScroll{
             .name = "Kicking",
             .pg = 25,
             .score = null,
+            .restriction = noBluesOrYellowsNextTurn,
         },
         PictureScroll{
             .name = "Weapon Dislodged",
             .pg = 27,
             .score = null,
+            .restriction = onlyGreensOrYellowsNextTurn, // TODO - allow kick, ban wild swing, change condition to "until weapon has been retrieved"
         },
         PictureScroll{
             .name = "Ducking",
             .pg = 29,
             .score = null,
+            .restriction = noOrangesNextTurn,
         },
         PictureScroll{
             .name = "Arm Wound",
             .pg = 31,
             .score = 2,
+            .restriction = noRedsOrOrangesNextTurn,
         },
         PictureScroll{
             .name = "Dodging",
             .pg = 33,
             .score = null,
+            .restriction = noExtendedRangeNextTurn,
         },
         PictureScroll{
             .name = "Extended Range Body Wound",
             .pg = 35,
             .score = 4,
+            .restriction = onlyBrownsNextTurn,
         },
         PictureScroll{
             .name = "Jumping Up",
             .pg = 37,
             .score = null,
+            .restriction = noBluesNextTurn,
         },
         PictureScroll{
             .name = "Charging",
             .pg = 39,
             .score = null,
+            .restriction = noGreensOrYellowsNextTurn,
         },
         PictureScroll{
             .name = "Knocked Down",
             .pg = 41,
             .score = 0,
+            .restriction = onlyJumpsNextTurn,
         },
         PictureScroll{
             .name = "Retrieving Weapon",
             .pg = 43,
             .score = null,
+            .restriction = noOrangesNextTurn, // TODO - may use weapon again
         },
         PictureScroll{
             .name = "Parrying High",
             .pg = 45,
             .score = -4,
+            .restriction = noExtendedRangeNextTurn,
         },
         PictureScroll{
             .name = "Extended Range Leg Wound",
             .pg = 47,
             .score = 3,
+            .restriction = onlyBrownsNextTurn,
         },
         PictureScroll{
             .name = "Parrying Low",
             .pg = 49,
             .score = -4,
+            .restriction = noExtendedRangeNextTurn,
         },
         PictureScroll{
             .name = "Extended Range Swinging",
             .pg = 51,
             .score = null,
+            .restriction = onlyBrownsOrBlacksNextTurn,
         },
         PictureScroll{
             .name = "Body Wound",
             .pg = 53,
             .score = 4,
+            .restriction = onlyGreensOrYellowsNextTurn,
         },
         PictureScroll{
             .name = "Extended Range Hooking Leg",
             .pg = 55,
             .score = null,
+            .restriction = onlyBrownsOrWhitesNextTurn, // TODO - except if on p47 go to p41 and no extended range next turn
         },
         PictureScroll{
             .name = "Extended Range Blocking",
             .pg = 57,
             .score = null,
+            .restriction = onlyExtendedRangeNextTurn,
         },
         PictureScroll{
             .name = "Extended Range Arm Wound",
             .pg = 59,
             .score = 2,
+            .restriction = onlyBrownsNextTurn,
         },
         PictureScroll{
             .name = "Extended Range Dodging",
             .pg = 61,
             .score = null,
+            .restriction = onlyExtendedRangeNextTurn, // TODO - add 2 to any charge or swing that scrose next turn
         },
         PictureScroll{
             .name = "Weapon Broken",
             .pg = 63,
             .score = null,
+            .restriction = noThrustsEver,
         },
     },
 };
@@ -865,4 +935,87 @@ fn newDwarfInChainmailWithTwoHandedAx(name: []const u8) Player {
         .required_maneuver_colours = ManeuverColour.initial_required,
         .forbidden_maneuver_colours = ManeuverColour.initial_forbidden,
     };
+}
+
+fn noExtendedRangeNextTurn(p: *Player) void {
+    p.setTempForbiddenType(ManeuverType.EXTENDED_RANGE);
+}
+
+fn noThrustsOrRedsNextTurn(p: *Player) void {
+    p.setTempForbiddenType(ManeuverType.THRUST);
+    p.setTempForbiddenColour(ManeuverColour.RED);
+    noExtendedRangeNextTurn(p);
+}
+
+fn noThrustsOrBluesNextTurn(p: *Player) void {
+    p.setTempForbiddenType(ManeuverType.THRUST);
+    p.setTempForbiddenColour(ManeuverColour.BLUE);
+    noExtendedRangeNextTurn(p);
+}
+
+fn onlyJumpsNextTurn(p: *Player) void {
+    p.setTempRequiredType(ManeuverType.JUMP);
+    noExtendedRangeNextTurn(p);
+}
+
+fn noBluesNextTurn(p: *Player) void {
+    p.setTempForbiddenColour(ManeuverColour.BLUE);
+    noExtendedRangeNextTurn(p);
+}
+
+fn noRedsOrOrangesNextTurn(p: *Player) void {
+    p.setTempForbiddenColour(ManeuverColour.RED);
+    p.setTempForbiddenColour(ManeuverColour.ORANGE);
+    noExtendedRangeNextTurn(p);
+}
+
+fn onlyGreensOrYellowsNextTurn(p: *Player) void {
+    p.setTempRequiredColour(ManeuverColour.GREEN);
+    p.setTempRequiredColour(ManeuverColour.YELLOW);
+    noExtendedRangeNextTurn(p);
+}
+
+fn onlyYellowsNextTurn(p: *Player) void {
+    p.setTempRequiredColour(ManeuverColour.YELLOW);
+    noExtendedRangeNextTurn(p);
+}
+
+fn noBluesOrYellowsNextTurn(p: *Player) void {
+    p.setTempForbiddenColour(ManeuverColour.BLUE);
+    p.setTempForbiddenColour(ManeuverColour.YELLOW);
+    noExtendedRangeNextTurn(p);
+}
+
+fn noOrangesNextTurn(p: *Player) void {
+    p.setTempForbiddenColour(ManeuverColour.ORANGE);
+    noExtendedRangeNextTurn(p);
+}
+
+fn onlyBrownsNextTurn(p: *Player) void {
+    p.setTempRequiredColour(ManeuverColour.BROWN);
+}
+
+fn noGreensOrYellowsNextTurn(p: *Player) void {
+    p.setTempForbiddenColour(ManeuverColour.GREEN);
+    p.setTempForbiddenColour(ManeuverColour.YELLOW);
+    noExtendedRangeNextTurn(p);
+}
+
+fn onlyBrownsOrBlacksNextTurn(p: *Player) void {
+    p.setTempRequiredColour(ManeuverColour.BROWN);
+    p.setTempRequiredColour(ManeuverColour.BLACK);
+}
+
+fn onlyBrownsOrWhitesNextTurn(p: *Player) void {
+    p.setTempRequiredColour(ManeuverColour.BROWN);
+    p.setTempRequiredColour(ManeuverColour.WHITE);
+}
+
+fn onlyExtendedRangeNextTurn(p: *Player) void {
+    p.setTempRequiredType(ManeuverType.EXTENDED_RANGE);
+}
+
+fn noThrustsEver(p: *Player) void {
+    p.setPermForbiddenType(ManeuverType.THRUST);
+    noExtendedRangeNextTurn(p);
 }
